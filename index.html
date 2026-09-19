@@ -45,6 +45,12 @@
   .cta-note{margin-top:10px;font-size:14px;color:var(--muted)}
   .placeholder{border:1.5px dashed var(--line);border-radius:10px;padding:20px;color:var(--muted);
     text-align:center;font-size:15px}
+  table.tests{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  table.tests th,table.tests td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  table.tests th{color:var(--muted);font-weight:600}
+  .pass{color:var(--good);font-weight:800} .fail{color:var(--bad);font-weight:800} .pending{color:var(--muted);font-weight:800}
+  code{background:#eef1f5;padding:1px 5px;border-radius:4px;font-size:13px}
+  @media(max-width:600px){ table.tests{font-size:12px} }
   ul.plain{padding-left:20px;margin:8px 0}
   ul.plain li{margin:6px 0}
   footer{max-width:720px;margin:0 auto;padding:24px 20px 60px;color:var(--muted);font-size:13px;
@@ -113,8 +119,8 @@
     <h2 style="text-align:left">지금 내 상황 확인하기</h2>
     <p>이번 달·작년 같은 달 매출을 넣으면, 내 매출 변화율과 전국·부산 지수 변화율을 나란히 비교해 드립니다.</p>
     <div class="cta-wrap">
-      <span class="cta disabled">F-01 시연 (준비 중)</span>
-      <p class="cta-note">app.html 구현 후 이 버튼이 "지금 내 상황 확인하기"로 바뀌며 ./app.html로 연결됩니다.</p>
+      <a class="cta" href="./app.html">지금 내 상황 확인하기</a>
+      <p class="cta-note">회원가입 없이 매출 두 칸만 입력하면 됩니다.</p>
     </div>
   </div>
 </section>
@@ -122,7 +128,12 @@
 <section>
   <div class="card">
     <h2>테스트 결과</h2>
-    <div class="placeholder">R-01 정상 · R-02 빈값 · R-03 오류 테스트 결과는 F-01 구현(M6-02) 후 이 자리에 채워집니다.</div>
+    <p class="note" id="testSummary">단위 테스트를 실행하는 중...</p>
+    <table class="tests" id="testTable">
+      <thead><tr><th>ID</th><th>요구사항</th><th>입력</th><th>기대</th><th>실제</th><th>판정</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="note">단위 테스트(UT)는 이 페이지를 열 때 <code>app.js</code>의 함수를 실제로 실행한 결과입니다. 통합 테스트(IT-01~03: <code>app.html</code>에서 직접 입력)는 학생이 직접 눌러 확인하고 <code>docs/test_log.md</code>에 기록하기 전까지 「확인 전」입니다.</p>
   </div>
 </section>
 
@@ -136,6 +147,69 @@
     </ul>
   </div>
 </section>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  var summary = document.getElementById("testSummary");
+  var tbody = document.querySelector("#testTable tbody");
+
+  function addRow(id, req, input, expected, actual, status) {
+    var tr = document.createElement("tr");
+    var cls = status === "통과" ? "pass" : (status === "실패" ? "fail" : "pending");
+    [id, req, input, expected, actual].forEach(function (t) {
+      var td = document.createElement("td");
+      td.textContent = t;
+      tr.appendChild(td);
+    });
+    var st = document.createElement("td");
+    st.textContent = status;
+    st.className = cls;
+    tr.appendChild(st);
+    tbody.appendChild(tr);
+  }
+
+  if (typeof calcMyChangeRate !== "function" || typeof validateSalesInput !== "function") {
+    summary.textContent = "단위 테스트를 실행하지 못했습니다(app.js를 불러오지 못함). index.html과 같은 폴더의 app.js·data.js를 확인해 주세요.";
+    return;
+  }
+
+  var M_EMPTY = "이번 달 매출과 작년 같은 달 매출을 모두 입력해 주세요.";
+  var M_BAD = "매출은 0보다 큰 숫자로 입력해 주세요.";
+  var pass = 0, total = 0;
+
+  function unit(id, req, input, expected, actual, ok) {
+    total++;
+    if (ok) pass++;
+    addRow(id, req, input, expected, actual, ok ? "통과" : "실패");
+  }
+
+  var my = calcMyChangeRate(8000000, 9000000);
+  var nat = calcIndexChangeRate(67.9, 70.0);
+  var bus = calcIndexChangeRate(64.5, 70.3);
+  unit("UT-01", "R-01 정상", "매출 8,000,000 / 9,000,000, 전국 67.9→70.0, 부산 64.5→70.3",
+    "-11.1% · -3.0% · -8.3%", formatPercent(my) + " · " + formatPercent(nat) + " · " + formatPercent(bus),
+    my === -11.1 && nat === -3 && bus === -8.3);
+
+  var r2 = validateSalesInput("", "9000000");
+  unit("UT-02", "R-02 빈값", "이번 달 매출 빈칸 / 9000000", M_EMPTY, r2.message || "(안내 없음)",
+    r2.valid === false && r2.message === M_EMPTY);
+
+  var r3a = validateSalesInput("-500000", "9000000");
+  var r3b = validateSalesInput("abc", "9000000");
+  unit("UT-03", "R-03 오류", "-500000 / 9000000, abc / 9000000", M_BAD + " (두 경우 모두)",
+    (r3a.message || "(안내 없음)") + " / " + (r3b.message || "(안내 없음)"),
+    r3a.valid === false && r3a.message === M_BAD && r3b.valid === false && r3b.message === M_BAD);
+
+  ["IT-01|R-01 정상", "IT-02|R-02 빈값", "IT-03|R-03 오류"].forEach(function (s) {
+    var p = s.split("|");
+    addRow(p[0], p[1], "app.html에서 직접 입력", "docs/qa_scenarios.md 참고", "-", "확인 전");
+  });
+
+  summary.textContent = "단위 테스트 " + pass + "/" + total + " 통과 (코드 자동 실행) · 통합 테스트 0/3 확인 완료 (학생 직접 확인 대기)";
+})();
+</script>
 
 <footer>
   수업 과제 데모입니다 · 투자·대출 판단의 근거가 아닙니다 · 공개 데이터(공공데이터포털 소상공인시장진흥공단, 공공누리) 기준 · 이 화면의 수치는 교육용 참고용입니다.
