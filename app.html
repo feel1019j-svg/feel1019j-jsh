@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>내 상황 확인하기 — 부산 vs 전국 체감경기</title>
+<style>
+  :root{
+    --bg:#f3f5f8; --card:#ffffff; --text:#1b2430; --muted:#5b6b7a;
+    --line:#e2e8f0; --accent:#1a5fb4; --accent-soft:#eaf1fb;
+    --bad:#c0392b; --bad-soft:#fdecea; --good:#1a7f4b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:17px/1.65 "Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+  main{max-width:560px;margin:0 auto;padding:32px 20px 60px}
+  h1{font-size:22px;margin:0 0 8px}
+  p{margin:0 0 12px}
+  .muted{color:var(--muted);font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin:16px 0}
+  .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:12px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .label{color:var(--muted);font-size:15px}
+  .row .num{font-size:24px;font-weight:800}
+  .num.bad{color:var(--bad)} .num.neutral{color:var(--text)} .num.good{color:var(--good)}
+  label{display:block;font-size:14px;color:var(--muted);margin:14px 0 6px}
+  input[type=text]{width:100%;padding:14px;font-size:18px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;color:var(--text)}
+  input[type=text]:focus{outline:2px solid var(--accent)}
+  button{width:100%;margin-top:20px;padding:16px;font-size:18px;font-weight:800;color:#fff;
+    background:var(--accent);border:0;border-radius:12px;cursor:pointer}
+  button:active{opacity:.9}
+  .notice{margin-top:14px;padding:12px 14px;border-radius:8px;font-size:15px;display:none}
+  .notice.show{display:block}
+  .notice.error{background:var(--bad-soft);color:#7a2e24;border-left:4px solid var(--bad)}
+  #resultCard{display:none}
+  #resultCard.show{display:block}
+  .source{font-size:13px;color:var(--muted);margin-top:8px}
+  a.back{display:inline-block;margin-bottom:16px;color:var(--accent);text-decoration:none;font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="./index.html">← 랜딩으로 돌아가기</a>
+  <h1>지금 내 상황 확인하기</h1>
+  <p class="muted">이번 달·작년 같은 달 매출을 입력하면, 내 매출 변화율과 전국·부산 소상공인 체감지수 변화율을 비교해 드립니다.</p>
+
+  <div class="card">
+    <h2 style="font-size:16px;margin:0 0 10px;color:var(--accent)">최신 체감지수 (자동 표시)</h2>
+    <div class="row">
+      <span class="label" id="nationalLabel">전국 경기전반체감지수</span>
+      <span class="num neutral" id="nationalLatestNum">-</span>
+    </div>
+    <div class="row">
+      <span class="label" id="busanLabel">부산 체감지수</span>
+      <span class="num neutral" id="busanLatestNum">-</span>
+    </div>
+    <p class="source" id="sourceNote"></p>
+  </div>
+
+  <div class="card">
+    <label for="curSales">이번 달 매출(원)</label>
+    <input type="text" inputmode="numeric" id="curSales" placeholder="예: 8,000,000">
+    <label for="prevSales">작년 같은 달 매출(원)</label>
+    <input type="text" inputmode="numeric" id="prevSales" placeholder="예: 9,000,000">
+    <button id="compareBtn">비교하기</button>
+    <div class="notice error" id="errorNotice"></div>
+  </div>
+
+  <div class="card" id="resultCard">
+    <h2 style="font-size:16px;margin:0 0 10px;color:var(--accent)">비교 결과</h2>
+    <div class="row">
+      <span class="label">내 매출 변화율</span>
+      <span class="num" id="myRateNum">-</span>
+    </div>
+    <div class="row">
+      <span class="label">전국 지수 변화율</span>
+      <span class="num" id="nationalRateNum">-</span>
+    </div>
+    <div class="row">
+      <span class="label">부산 지수 변화율</span>
+      <span class="num" id="busanRateNum">-</span>
+    </div>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  var idx = null;
+  try {
+    idx = getIndexData();
+  } catch (e) {
+    idx = null;
+  }
+
+  var sourceNote = document.getElementById("sourceNote");
+  var errorNotice = document.getElementById("errorNotice");
+  var resultCard = document.getElementById("resultCard");
+
+  if (!idx) {
+    document.getElementById("nationalLatestNum").textContent = "불러오기 실패";
+    document.getElementById("busanLatestNum").textContent = "불러오기 실패";
+    sourceNote.textContent = "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    document.getElementById("compareBtn").disabled = true;
+  } else {
+    document.getElementById("nationalLabel").textContent = "전국 경기전반체감지수 (" + idx.latestMonth + ")";
+    document.getElementById("busanLabel").textContent = "부산 체감지수 (" + idx.latestMonth + ")";
+    document.getElementById("nationalLatestNum").textContent = idx.nationalLatest;
+    document.getElementById("busanLatestNum").textContent = idx.busanLatest;
+    sourceNote.textContent = "출처: 공공데이터포털 소상공인시장진흥공단 소상공인 시장경기동향(공공누리) · 기준월 " + idx.latestMonth + "(1년 전 " + idx.prevMonth + " 대비)";
+  }
+
+  document.getElementById("compareBtn").addEventListener("click", function () {
+    errorNotice.classList.remove("show");
+    resultCard.classList.remove("show");
+
+    if (!idx) {
+      errorNotice.textContent = "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      errorNotice.classList.add("show");
+      return;
+    }
+
+    var curStr = document.getElementById("curSales").value;
+    var prevStr = document.getElementById("prevSales").value;
+    var check = validateSalesInput(curStr, prevStr);
+
+    if (!check.valid) {
+      errorNotice.textContent = check.message;
+      errorNotice.classList.add("show");
+      return;
+    }
+
+    var myRate = calcMyChangeRate(check.current, check.previous);
+    var nationalRate = calcIndexChangeRate(idx.nationalLatest, idx.nationalPrev);
+    var busanRate = calcIndexChangeRate(idx.busanLatest, idx.busanPrev);
+
+    function setNum(id, v) {
+      var el = document.getElementById(id);
+      el.textContent = formatPercent(v);
+      el.className = "num " + (v < 0 ? "bad" : (v > 0 ? "good" : "neutral"));
+    }
+    setNum("myRateNum", myRate);
+    setNum("nationalRateNum", nationalRate);
+    setNum("busanRateNum", busanRate);
+
+    resultCard.classList.add("show");
+  });
+})();
+</script>
+</body>
+</html>
